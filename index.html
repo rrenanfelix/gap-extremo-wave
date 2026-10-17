@@ -1,0 +1,119 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GAP EXTREMO WAVE</title><link rel="stylesheet" href="styles.css"></head><body>
+<header>
+ <div class="brand"><div class="logo">G13</div><h1>GAP EXTREMO WAVE<small>Lab20 s05 · favorito 13+ posições acima · odd 1.50–2.30 · stake 100</small></h1></div>
+ <div class="seg" id="seg"><button data-ds="big" class="on">🏆 Ligas grandes <span class="n" id="n-big">…</span></button><button data-ds="all">🌍 Geral <span class="n" id="n-all">…</span></button></div>
+ <nav><button data-t="hoje" class="on">Entradas</button><button data-t="hist">Histórico</button><button data-t="minhas">Minhas apostas</button><button data-t="regras">Regras</button></nav>
+ <div class="tools"><button class="refbtn" data-mode="rebuild" title="Regera o Lab20 com os jogos já escaneados">🔄 Atualizar jogos</button><button class="refbtn" data-mode="results" title="Apura placares na 8891 e regera o Lab20">🏁 Atualizar resultados</button><span class="refmsg" id="refmsg"></span><span class="gen" id="gen"></span></div>
+</header>
+<main>
+<section id="t-hoje"></section>
+<section id="t-hist" class="hidden"></section>
+<section id="t-minhas" class="hidden"></section>
+<section id="t-regras" class="hidden"></section>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const fmt=n=>(n>0?'+':'')+Math.round(n);
+const cls=n=>n>0?'pos':n<0?'neg':'zero';
+const DS={big:{label:'Ligas grandes',icon:'🏆',src:'http://100.93.207.126:8892/lab20/big/s05.html'},all:{label:'Geral (todas as ligas)',icon:'🌍',src:'http://100.93.207.126:8892/lab20/s05.html'}};
+let ds=(location.hash.match(/ds=(big|all)/)||[])[1]||'big', tab=(location.hash.match(/t=(\w+)/)||[])[1]||'hoje';
+let bets={}, D=null;
+const STATIC=/github\.io$/.test(location.hostname)||location.protocol==='file:';
+if(STATIC)document.body.classList.add('static');
+const side=r=>`<span class="pill ${r.side}">${r.side==='home'?'CASA':'FORA'}</span>`;
+const gapc=g=>`<span class="gap ${g>=20?'g3':g>=16?'g2':''}">${g??'-'}</span>`;
+function jogo(r){const h=r.side==='home'?`<span class="fav">${r.home}</span>`:r.home, a=r.side==='away'?`<span class="fav">${r.away}</span>`:r.away;
+ return `<div class="match"><span class="t">${h}<span class="vs">x</span>${a}${(ds==='all'&&r.major)?' <span class="pill big">BIG</span>':''}</span><span class="tag">${r.country?r.country+' · ':''}${r.league} · ${r.fav_rank??'?'}º vs ${r.opp_rank??'?'}º</span></div>`}
+function betbtn(r){return `<button class="betbtn ${bets[r.key]?'on':''}" data-key="${r.key}" data-meta='${JSON.stringify({fid:r.fid,side:r.side,strategy:'s05',date:r.date,time:r.time,home:r.home,away:r.away,odd:r.odd,league:r.league}).replace(/'/g,'&#39;')}'>${bets[r.key]?'✓ Apostei':'Apostar'}</button>`}
+const dshort=d=>d.slice(8,10)+'/'+d.slice(5,7);
+function res(r){return `<span class="res ${r.result}"><span class="sc">${r.score}</span>${r.result==='pending'?'PENDENTE':r.result.toUpperCase()}${r.profit!=null?' <span class="'+cls(r.profit)+'">'+fmt(r.profit)+'</span>':''}</span>`}
+function row(r,withRes){return `<tr class="${bets[r.key]?'bet':''}" data-key="${r.key}" data-side="${r.side}" data-month="${r.date.slice(0,7)}"><td class="mut" style="white-space:nowrap">${dshort(r.date)} <b style="color:var(--tx)">${r.time}</b></td><td>${jogo(r)}</td><td>${side(r)}</td><td class="num">${gapc(r.gap)}</td><td class="num odd">${r.odd.toFixed(2)}</td><td class="num hm mut">${r.form_w??'-'}W · ${r.cp}/4</td>
+${withRes?`<td>${res(r)}</td>`:''}<td style="text-align:right">${betbtn(r)}</td></tr>`}
+const head=w=>`<thead><tr><th>Data</th><th>Jogo (favorito em negrito)</th><th>Lado</th><th class="num">Gap</th><th class="num">Odd</th><th class="num hm">Forma · checks</th>${w?'<th>Resultado</th>':''}<th></th></tr></thead>`;
+const table=(w,rows,id)=>`<div class="tw"><table${id?' id="'+id+'"':''}>${head(w)}<tbody>${rows.map(r=>row(r,w)).join('')}</tbody></table></div>`;
+function kpis(s,extra,hero){return `<div class="kpis">
+<div class="kpi ${hero?'hero':''}"><b class="${cls(s.pnl)}">${fmt(s.pnl)}</b><span>P&amp;L (R$)</span></div>
+<div class="kpi"><b class="${cls(s.roi)}">${fmt(s.roi)}%</b><span>ROI</span></div>
+<div class="kpi"><b>${s.wr}%</b><span>acerto</span><small>${s.green}G · ${s.red}R</small></div>
+<div class="kpi"><b>${s.n}</b><span>finalizados</span>${s.pend?`<small>${s.pend} pendente(s)</small>`:''}</div>
+<div class="kpi"><b>${s.odd||'-'}</b><span>odd média</span></div>${extra||''}</div>`}
+function bar(roi){const w=Math.min(50,Math.abs(roi)/100*50);return `<div class="bar"><span class="mid"></span><i class="${cls(roi)}" style="${roi>=0?'left:50%':'right:50%'};width:${w}%"></i></div>`}
+function statRow(l,s){return `<tr><td>${l}${bar(s.roi)}</td><td class="num">${s.n}</td><td class="num pos">${s.green}</td><td class="num neg">${s.red}</td><td class="num">${s.wr}%</td><td class="num hm">${s.odd}</td><td class="num ${cls(s.pnl)}">${fmt(s.pnl)}</td><td class="num ${cls(s.roi)}"><b>${fmt(s.roi)}%</b></td></tr>`}
+const statHead=l=>`<thead><tr><th>${l}</th><th class="num">N</th><th class="num">G</th><th class="num">R</th><th class="num">WR</th><th class="num hm">Odd</th><th class="num">P&amp;L</th><th class="num">ROI</th></tr></thead>`;
+const statTable=(l,arr)=>`<div class="tw"><table>${statHead(l)}<tbody>${arr.map(x=>statRow(x.label,x)).join('')}</tbody></table></div>`;
+const sec=(t,sub)=>`<div class="section"><h2>${t}</h2>${sub?`<span class="sub">${sub}</span>`:''}</div>`;
+const seqHtml=s=>'<div class="seq">'+[...s.seq].map(c=>`<span class="${c}" title="${c}"></span>`).join('')+`</div><p class="mut" style="margin:4px 0 0">maior série de reds: <b>${s.max_red}</b> · maior série de greens: <b>${s.max_green}</b> · agora: <b>${s.current||'-'}</b> · drawdown máx: <b class="neg">${fmt(s.max_dd)}</b></p>`;
+function curve(c){if(!c||c.length<2)return '<p class="mut">sem dados</p>';const W=800,H=150,P=8;const mn=Math.min(0,...c),mx=Math.max(0,...c),sp=(mx-mn)||1;
+ const x=i=>P+i/(c.length-1)*(W-2*P), y=v=>H-P-(v-mn)/sp*(H-2*P);const zero=y(0);
+ const pts=c.map((v,i)=>`${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');const last=c[c.length-1];
+ return `<svg class="curve" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><defs><linearGradient id="gf" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${last>=0?'#22c55e':'#ef4444'}" stop-opacity=".35"/><stop offset="1" stop-color="${last>=0?'#22c55e':'#ef4444'}" stop-opacity="0"/></linearGradient></defs>
+ <polygon points="${x(0)},${zero} ${pts} ${x(c.length-1)},${zero}" fill="url(#gf)"/><line x1="0" x2="${W}" y1="${zero}" y2="${zero}" stroke="#22303f" stroke-dasharray="4 4"/><polyline points="${pts}" fill="none" stroke="${last>=0?'#22c55e':'#ef4444'}" stroke-width="2"/></svg>
+ <p class="mut" style="margin:2px 0 0">acumulado (stake 100) · ${c.length} jogos · máx <b class="pos">${fmt(Math.max(...c))}</b> · mín <b class="neg">${fmt(Math.min(...c))}</b> · atual <b class="${cls(last)}">${fmt(last)}</b></p>`}
+function render(d){D=d;
+ $('#gen').textContent='atualizado '+d.generated_at.slice(0,16).replace('T',' ');
+ $('#n-'+d.dataset).textContent=d.stats.all.n;
+ const up=d.upcoming, days=[...new Set(up.map(r=>r.date))];
+ let h=sec(`${DS[ds].icon} ${DS[ds].label} · mês ${d.month}`,`hoje: ${d.stats.today.n?fmt(d.stats.today.pnl)+' em '+d.stats.today.n+' jogo(s)':'nada fechado ainda'}`);
+ h+=kpis(d.stats.month,`<div class="kpi"><b>${d.stats.streaks_month.current||'-'}</b><span>série atual</span></div>`,true);
+ for(const day of [...new Set([d.today,d.tomorrow,...days])].sort()){const list=up.filter(r=>r.date===day);
+  h+=`<div class="day"><span class="d">${dshort(day)}</span>${day===d.today?'<span class="b today">HOJE</span>':day===d.tomorrow?'<span class="b tmr">AMANHÃ</span>':''}<span class="b">${list.length} entrada(s)</span></div>`;
+  h+=list.length?table(false,list):`<div class="empty">Nenhum favorito ${ds==='big'?'de liga grande ':''}com gap 13+ ainda. Jogos novos entram sozinhos (scan 8891 a cada 4h + Lab20 a cada hora) e nunca saem da lista.</div>`}
+ if(d.watch.length)h+=sec('Monitorados',`hoje/amanhã, ${ds==='big'?'liga grande ':'gap 10+ '}fora da regra`)+`<div class="tw"><table><thead><tr><th>Data</th><th>Jogo (favorito em negrito)</th><th>Lado</th><th class="num">Gap</th><th class="num">Odd</th><th>Motivo</th></tr></thead><tbody>${d.watch.map(r=>`<tr><td class="mut" style="white-space:nowrap">${dshort(r.date)} <b style="color:var(--tx)">${r.time}</b></td><td>${jogo(r)}</td><td>${side(r)}</td><td class="num">${gapc(r.gap)}</td><td class="num odd">${r.odd.toFixed(2)}</td><td class="mut">${r.why}</td></tr>`).join('')}</tbody></table></div>`;
+ if(d.stale.length)h+=sec(`Sem resultado apurado (${d.stale.length})`,'clique em 🏁 Atualizar resultados')+table(false,d.stale);
+ $('#t-hoje').innerHTML=h;
+ const s=d.stats;let hh=sec(`${DS[ds].icon} ${DS[ds].label} · histórico completo`)+kpis(s.all,`<div class="kpi"><b class="neg">${fmt(s.streaks.max_dd)}</b><span>drawdown máx</span></div>`,true);
+ hh+=sec('Curva de banca')+`<div class="card">${curve(s.streaks.curve)}</div>`;
+ hh+=sec('Últimos 7 dias')+kpis(s.d7);
+ hh+=sec('Sequência')+`<div class="card">${seqHtml(s.streaks)}</div>`;
+ hh+='<div class="grid2">';
+ hh+='<div>'+sec('Por mês')+statTable('Mês',s.by_month)+'</div>';
+ if(ds==='all')hh+='<div>'+sec('Ligas grandes × outras')+statTable('Grupo',s.by_major)+'</div>';
+ hh+='<div>'+sec('Casa vs Fora')+statTable('Lado',s.by_side)+'</div><div>'+sec('Por faixa de odd')+statTable('Odd',s.by_odd)+'</div>';
+ hh+='<div>'+sec('Por tamanho do gap')+statTable('Gap',s.by_gap)+'</div><div>'+sec('Por checks')+statTable('Checks',s.by_cp)+'</div>';
+ hh+='<div>'+sec('Por forma')+statTable('Forma',s.by_form)+'</div><div>'+sec('Por tier de liga')+statTable('Tier',s.by_tier)+'</div>';
+ if(ds==='all')hh+='<div>'+sec('Por país','top 25')+statTable('País',s.by_country)+'</div>';
+ hh+='</div>';
+ hh+=sec('Por liga',ds==='all'?'top 40 por volume':'')+statTable('Liga',s.by_league);
+ hh+=sec('Por dia','últimos 60')+`<div class="tw"><table>${statHead('Dia')}<tbody>${s.by_day.map(x=>statRow(dshort(x.date)+' <span class="mut">'+x.date.slice(0,4)+'</span>',x)).join('')}</tbody></table></div>`;
+ const months=[...new Set(d.finished.map(r=>r.date.slice(0,7)))];
+ hh+=sec('Jogos finalizados',`${d.finished.length} mais recentes`)+`<div class="filters"><label class="chk"><input type="checkbox" id="onlymine"> só as que apostei</label><select id="fside"><option value="">casa + fora</option><option value="home">só casa</option><option value="away">só fora</option></select><select id="fmonth"><option value="">todos os meses</option>${months.map(m=>`<option value="${m}">${m}</option>`).join('')}</select><span class="mut" id="fcount"></span></div>`+table(true,d.finished,'fintab');
+ $('#t-hist').innerHTML=hh;
+ const applyF=()=>{const om=$('#onlymine').checked,fs=$('#fside').value,fm=$('#fmonth').value;let n=0;document.querySelectorAll('#fintab tbody tr[data-key]').forEach(tr=>{const ok=(!om||bets[tr.dataset.key])&&(!fs||tr.dataset.side===fs)&&(!fm||tr.dataset.month===fm);tr.style.display=ok?'':'none';if(ok)n++});$('#fcount').textContent=n+' jogo(s)'};
+ ['#onlymine','#fside','#fmonth'].forEach(q=>$(q).onchange=applyF);applyF();
+ let mm=sec(`${DS[ds].icon} Minhas apostas`,`marcações compartilhadas com o Lab20 (${d.n_bets_total} no total, chave jogo+lado) — aqui só as que caem no s05 ${DS[ds].label.toLowerCase()}`)+kpis(s.mine);
+ mm+=d.mine.length?table(true,d.mine):'<div class="empty">Nenhuma aposta marcada ainda. Use o botão Apostar nas entradas.</div>';
+ $('#t-minhas').innerHTML=mm;
+ $('#t-regras').innerHTML=sec('Regra do s05 "Gap Extremo 13+"')+`<div class="card"><ul class="rules">
+ <li>Favorito (<span class="pill home">CASA</span> ou <span class="pill away">FORA</span>) com odd entre <span class="chip">1.50</span> e <span class="chip">2.30</span> na abertura.</li>
+ <li>Favorito <b>13+ posições</b> acima do adversário na tabela. O gap SÓ paga no extremo: 8–12 não vale (backtest n=3903).</li>
+ <li><b>🏆 Ligas grandes:</b> só Premier League, La Liga, Serie A, Bundesliga, Ligue 1, Primeira Liga, Eredivisie, Championship.</li>
+ <li><b>🌍 Geral:</b> qualquer liga que a 8891 escaneia (inclui reservas, 2ª divisões, etc.). Use a aba Histórico → "Ligas grandes × outras" e "Por tier" pra ver onde o método segura.</li>
+ <li>Sem cap diário, sem exigir 4/4. BACK no favorito, stake fixa 100.</li>
+ <li>Pick congelada na 1ª vez que aparece (odd e gap da hora); nunca some, mesmo se a odd mudar depois.</li></ul></div>
+ <p class="mut">Fonte: picks congeladas do PRE WAVE Lab20 — 🏆 <a href="${DS.big.src}">8892/lab20/big/s05.html</a> · 🌍 <a href="${DS.all.src}">8892/lab20/s05.html</a>. Filtro calibrado no próprio histórico (in-sample) — hipótese, não garantia. Esta dash não escreve nada: Apostar e Atualizar são repassados pra 8892.</p>`;
+}
+function loadBets(){if(STATIC)return Promise.resolve();return fetch('api/bets',{cache:'no-store'}).then(r=>r.json()).then(j=>{bets=(j&&j.bets)||{}}).catch(()=>{})}
+function loadData(){return fetch(STATIC?`data/${ds}.json?t=${Date.now()}`:'api/data?ds='+ds,{cache:'no-store'}).then(r=>r.json()).then(j=>{if(STATIC&&j.bets)bets=j.bets;render(j)})}
+function load(){return loadBets().then(loadData)}
+function loadCounts(){['big','all'].forEach(k=>{if(k!==ds)fetch(STATIC?`data/${k}.json?t=${Date.now()}`:'api/data?ds='+k,{cache:'no-store'}).then(r=>r.json()).then(j=>$('#n-'+k).textContent=j.stats.all.n).catch(()=>{})})}
+function setHash(){history.replaceState(null,'',`#ds=${ds}&t=${tab}`)}
+document.addEventListener('click',e=>{const b=e.target.closest('.betbtn');if(!b||STATIC)return;const k=b.dataset.key,on=!bets[k];let meta={};try{meta=JSON.parse(b.dataset.meta)}catch(_){}
+ if(on)bets[k]=meta;else delete bets[k];
+ document.querySelectorAll(`[data-key="${k}"]`).forEach(el=>{if(el.tagName==='TR')el.classList.toggle('bet',on);else{el.classList.toggle('on',on);el.textContent=on?'✓ Apostei':'Apostar'}});
+ fetch('api/bets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,on,meta})}).then(r=>{if(!r.ok)throw 0;return loadData()}).catch(()=>{alert('Não consegui salvar (8892 offline?)');load()});
+});
+function showTab(t){tab=t;document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x.dataset.t===t));['hoje','hist','minhas','regras'].forEach(k=>$('#t-'+k).classList.toggle('hidden',k!==t));setHash()}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>showTab(b.dataset.t));
+document.querySelectorAll('#seg button').forEach(b=>b.onclick=()=>{ds=b.dataset.ds;document.querySelectorAll('#seg button').forEach(x=>x.classList.toggle('on',x.dataset.ds===ds));setHash();$('#t-hoje').innerHTML='<p class="mut">carregando…</p>';loadData()});
+document.querySelectorAll('#seg button').forEach(x=>x.classList.toggle('on',x.dataset.ds===ds));showTab(tab);
+const rm=$('#refmsg'),btns=[...document.querySelectorAll('.refbtn')];
+function poll(t0){fetch('api/rebuild/status',{cache:'no-store'}).then(r=>r.json()).then(j=>{
+ if(j.running){rm.textContent=(j.mode==='results'?'apurando resultados... ':'atualizando... ')+Math.round((Date.now()-t0)/1000)+'s';setTimeout(()=>poll(t0),2000);return}
+ if(j.ok===false){rm.textContent='falhou: '+(j.error||'?');btns.forEach(b=>b.disabled=false);return}
+ rm.textContent='pronto';btns.forEach(b=>b.disabled=false);load();loadCounts()}).catch(()=>setTimeout(()=>poll(t0),3000))}
+btns.forEach(b=>b.onclick=()=>{btns.forEach(x=>x.disabled=true);rm.textContent='iniciando...';
+ fetch('api/rebuild'+(b.dataset.mode==='results'?'?results=1':''),{method:'POST'}).then(r=>{if(!r.ok)throw 0;poll(Date.now())}).catch(()=>{rm.textContent='erro ao acionar (8892 offline?)';btns.forEach(x=>x.disabled=false)})});
+load().then(loadCounts);
+if(STATIC){btns.forEach(b=>b.remove());rm.textContent='site estático · atualiza sozinho a cada hora';setInterval(()=>{load();loadCounts()},10*60*1000)}
+</script></body></html>
